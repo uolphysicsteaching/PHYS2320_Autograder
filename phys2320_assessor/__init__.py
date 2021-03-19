@@ -5,7 +5,7 @@ Module of functions for doing Computing 2 Assessment
 
 __all__=["cohort","result","funcs","assessor", "Assessor","ComputingClass"]
 
-__version__ = "2021.0.0"
+__version__="2020.0.1"
 
 from .assessor import Assessor
 from .cohort import ComputingClass
