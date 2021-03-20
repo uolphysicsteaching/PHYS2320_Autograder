@@ -2,7 +2,7 @@ import setuptools
 from pathlib import Path
 
 def version():
-    p=Path(__file__)/".."/"phys2320_assessor"/"__init__.py"
+    p=Path(__file__).parent/"phys2320_assessor"/"__init__.py"
     for line in p.read_text().split("\n"):
         line=line.strip()
         if line.startswith("__version__"):
