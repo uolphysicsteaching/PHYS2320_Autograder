@@ -77,7 +77,8 @@ class Assessor(object):
             for k in entry:
                 if k.endswith("_error"):
                     continue
-                entry[k]=self.normalise_one_val(entry,k)
+                template=self.template.get(k,None)
+                entry[k]=self.normalise_one_val(entry,k,template)
             entry={k:entry[k] for k in entry if not k.endswith("_error")} # filter out error keys
         else:
             raise TypeError("Trying to normalise a top level that is not a dictionary.")
@@ -95,20 +96,26 @@ class Assessor(object):
 ############## Core functionality ##################################################
 ####################################################################################
 
-    def normalise_one_val(self,entries,k):
+    def normalise_one_val(self,entries,k,template=None):
         """Recurses through structures trying to turn floats into Results."""
         entry=entries[k]
+        if template is not None and entry is not None and not isinstance(entry,template):
+            print(f"Warning entry {k} was expected to be a {template.__name__} but was actually a {type(entry)}")
         if isinstance(k,str) and k.endswith("_error"): # Do nothing with keys that look like they contain errors
             return entry
         if isinstance(entry,dict):
+            if not isinstance(template,dict):
+                template={}
             for ik in entry:
                 if ik.endswith("_error"): # skip error keys
                     continue
-                entry[ik]=self.normalise_one_val(entry,ik) #recurse for this key
+                entry[ik]=self.normalise_one_val(entry,ik,template.get(ik,None)) #recurse for this key
             entries[k]={ik:entry[ik] for ik in entry if not ik.endswith("_error")} # filter out error keys
         elif isinstance(entry,list):
+            if not isinstance(template,list):
+                template=[None]*len(entry)
             for ix,e in enumerate(entry):
-                entry[ix]=self.normalise_one_val(entry,ix)
+                entry[ix]=self.normalise_one_val(entry,ix,template[ix])
             entries[k]=entry
         elif isinstance(entry,(int,float)):
             if isinstance(k,str) and "{}_error".format(k) in entries:
@@ -369,7 +376,7 @@ class Assessor(object):
                     </tr>""")
 
 
-                std_filename=self.stdfile_pattern.format(int(user_settings["features"]))
+                std_filename=self.stdfile_pattern.format(**user_settings)
                 self.std_data=path.join(self.subdir,std_filename)
                 shutil.copyfile(path.join(".",std_filename),self.std_data)
 

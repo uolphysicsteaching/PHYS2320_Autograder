@@ -4,7 +4,7 @@
 
 package:
   name: '{{ name|lower }}'
-  version: '2010.0.1'
+  version: '2020.0.1'
 
 source:
   git_tag: main

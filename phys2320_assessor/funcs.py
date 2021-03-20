@@ -234,6 +234,45 @@ def parse_code(filename):
 def is_number(dictionary, key):
     return key in dictionary and isinstance(dictionary[key], Number)
 
+def bool_conv(value):
+    """Convert value to a boolean if possible.
+
+    Args:
+        value (str):
+            value to convert
+
+    Returns:
+        (bool):
+            True if value in True, On, Yes, 1, False if value in False, Off, No, 0
+
+    Raises:
+        TypeError:
+            if value not True or False
+    """
+    if value.lower() in ["true", "on", "yes", "1"]:
+        return True
+    if value.lower() in ["false", "off", "no", "0"]:
+        return False
+    raise ValueError(f"{value} cannot be interpreted as a boolean.")
+
+
+def _to_type(value):
+    """Convert a string value to a better type if possible.
+
+    Args:
+        value (str):
+            String representation to convert to.
+
+    Returns:
+        int, {float, bool or str}:
+            values converted to one of these types.
+    """
+    for cnv in [int, float, bool_conv, str]:
+        try:
+            return cnv(value)
+        except (TypeError, ValueError):
+            continue
+
 
 def read_user_data(datafile):
     """Read the User's data file to get the parameters."""
@@ -243,7 +282,7 @@ def read_user_data(datafile):
             for line in user_data:
                 if "=" in line:
                     key, value = line.split("=")
-                    data[key.strip().lower()] = value.strip().strip(",")
+                    data[key.strip().lower()] = _to_type(value.strip().strip(","))
                 elif "&END" in line:
                     break
             else:
