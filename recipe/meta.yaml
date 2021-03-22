@@ -1,14 +1,14 @@
 {% set data = load_setup_py_data() %}
 
 package:
-  name: "{{ data.get('name') }}"
-  version: "{{ data.get('version') }}"
+  name: "phys2320_assessor"
+  version: {{ data.get('version') }}
 
 source:
   git_tag: main
   git_url: git@github.com:uolphysicsteaching/PHYS2320_Autograder.git
 build:
-  number: 1
+  number: 2
   script: {{ PYTHON }} setup.py install --single-version-externally-managed --record=record.txt
 
 requirements:
@@ -26,8 +26,8 @@ requirements:
     - uncertainties
 
 about:
-  home: https://github.com/uolphysicsteaching/PHYS2320_Autograder/
+  home: {{ data.get('url') }}
   license: BSD 3 Clause License
   license_family: BSD
   license_file: ''
-  summary: Autograder for Leeds Physics 2nd Year Python Course
+  summary: {{ data.get('description') }}
