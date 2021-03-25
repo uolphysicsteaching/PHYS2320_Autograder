@@ -112,7 +112,7 @@ class Assessor(object):
     def lint_code(self):
         """Run pylint over the code and report the global code score."""
         with CaptureOutput():
-            results=pylintRun(self.module.__file__,do_exit=False)
+            results=pylintRun([self.module.__file__],do_exit=False)
         print("<H2>Code quality Analysis</H2>")
         quality=results.linter.stats['global_note']
         print(f"<p>Pylint code quality: {round(quality,1)}%</p>")
