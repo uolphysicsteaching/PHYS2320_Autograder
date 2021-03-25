@@ -114,8 +114,21 @@ class Assessor(object):
         with CaptureOutput():
             results=pylintRun([self.module.__file__],do_exit=False)
         print("<H2>Code quality Analysis</H2>")
-        quality=results.linter.stats['global_note']
-        print(f"<p>Pylint code quality: {round(quality,1)}%</p>")
+        print("""<p>These are the results from running an autmartic code analysis tool over your code. Just because this
+              thinks something is a problem, does not mean you have been marked down for it. This information is provided
+              to help the (human) graders evaluate your code.</p>""")
+        stats=results.linter.stats
+        quality=stats["global_note"]*10
+        print("<ul>")
+        print(f"<li>Pylint code quality score: {round(quality,1)}%</li>")
+        print(f"<li>Number of warning detected: {stats['warning']}</li>")
+        print(f"<li>Number of errors detected: {stats['error']}</li>")
+        print(f"<li>Number of fatal errors detected: {stats['fatal']}</li>")
+        print(f"<li>Number of functions: {stats['function']}</li>")
+        print(f"<li>... of which undocumented: {round(100*stats['undocumented_function']/stats['function'],1)}%</li>")
+        print(f"<li>Percentage of duplicated lines: {round(stats['percent_duplicated_lines'],1)}</li>")
+        print("</ul>")
+
 
     def sanitize_student_answers(self, student_ans):
         """Should be implemented if necessary in sepcoifc subclass!"""

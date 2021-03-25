@@ -30,7 +30,7 @@ def build_submission_list(dir,SUBMISSIION_PATTERN):
             files.append(f)
     return files
 
-def process_file(f):
+def process_file(f, clobber):
     """Read a submission description file and do the appropriate filing operations."""
     namepat=re.compile(r"Name:\s*([^\(]*)\(([^\)]*)\)")
     with open(f,"r",encoding="utf-8") as submission:
@@ -53,7 +53,8 @@ def process_file(f):
             elif line.strip().startswith("Filename:"):
                 parts=line.strip().split(":")
                 src=parts[1].strip()
-                moves.append((src,dest))
+                if clobber or not path.exists(dest):
+                    moves.append((src,dest))
     print("Making {}".format(pth))
     if not path.exists(pth):
         os.mkdir(pth)
@@ -71,7 +72,7 @@ def process_file(f):
     if path.exists(f):
         os.unlink(f) # Remove the readme file if it exists
 
-def file_work(ASSIGNMENT_DOWNLOAD,SUBMISSIION_PATTERN):
+def file_work(ASSIGNMENT_DOWNLOAD,SUBMISSIION_PATTERN, clobber=True):
     """ Run the filing script."""
 
     os.makedirs("Student Work",exist_ok=True)
@@ -85,7 +86,7 @@ def file_work(ASSIGNMENT_DOWNLOAD,SUBMISSIION_PATTERN):
     print("Processing Files: Building file list")
     files=build_submission_list(os.getcwd(),SUBMISSIION_PATTERN)
     for f in files:
-        process_file(f)
+        process_file(f, clobber)
 
 
 
