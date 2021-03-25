@@ -73,6 +73,7 @@ class Assessor(object):
         self.code = None
         self.data = None
         self.fixes = None
+        self.calc_ansers=None
         self.mods = []
         self.files = []
         self.metadata = {}
@@ -631,6 +632,7 @@ class Assessor(object):
                         msys.exit = raiseExit
                     # Change to the subdirectory becayse sine styudebts have hardcoded their data files
                     calc_answers = self.get_calc_answers(userfile)
+                    self.calc_answers=calc_answers
                     print("<h4>Running Student code</h4>")
                     sresults, self.student_time = self.run_code(
                         self.run_student, userfile
