@@ -114,7 +114,7 @@ class Assessor(object):
         with CaptureOutput():
             results=pylintRun(self.module.__file__,do_exit=False)
         print("<H2>Code quality Analysis</H2>")
-        quality=results.linter.stats['global_note']*10
+        quality=results.linter.stats['global_note']
         print(f"<p>Pylint code quality: {round(quality,1)}%</p>")
 
     def sanitize_student_answers(self, student_ans):
