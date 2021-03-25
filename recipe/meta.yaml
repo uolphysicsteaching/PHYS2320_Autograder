@@ -19,11 +19,13 @@ requirements:
     - numpy>=1.18
     - matplotlib>=3.0
     - uncertainties
+    - pylint >2.6
   run:
     - python
     - numpy>=1.18
     - matplotlib>=3.0
     - uncertainties
+    - pylint >2.6
 
 about:
   home: {{ data.get('url') }}

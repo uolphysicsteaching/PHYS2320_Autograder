@@ -6,12 +6,14 @@ from os import path
 import builtins
 import re
 import os
+import io
 import sys
 import shutil
 import types
 import importlib
 from pathlib import Path
 
+import pylint
 from traceback import format_exc
 from time import perf_counter
 from inspect import getdoc, isclass, ismodule, getargspec, iscode, isfunction, getargs
@@ -106,6 +108,14 @@ class Assessor(object):
     ####################################################################################
     ################ Methods that might need to be overidden in each year's sub-class ##
     ####################################################################################
+
+    def lint_code(self):
+        """Run pylint over the code and report the global code score."""
+        with CaptureOutput():
+            results=pylint.lint.Run(self.module.__file__,do_exit=False)
+        print("<H2>Code quality Analysis</H2>")
+        quality=results.linter.stats['global_note']*10
+        print(f"<p>Pylint code quality: {round(quality,1)}%</p>")
 
     def sanitize_student_answers(self, student_ans):
         """Should be implemented if necessary in sepcoifc subclass!"""
@@ -663,6 +673,7 @@ class Assessor(object):
                     self.get_func_details()
                     self.save_func_details()
                     print("<h1>Student Code</h1>")
+                    self.lint_code()
                     lexer = pygments.lexers.get_lexer_by_name("Python")
                     formatter = pygments.formatters.html.HtmlFormatter(
                         noclasses=True, linenos=True, style="xcode"
@@ -854,7 +865,10 @@ class Assessor(object):
                 raise ImportError("No Student code!")
             mod_name = path.splitext(path.split(self.code)[-1])[0]
             print(f"Got module name '{mod_name}'")
-            self.module = importlib.import_module(mod_name)
+            with CaptureOutput() as on_import:
+                self.module = importlib.import_module(mod_name)
+            on_impoprt=str(on_import).replace("\n","<br/>\n")
+            print(on_import)
             print("<h2>Finished Module import</h2>")
             if len(open_figures()) > 0:
                 self.save_figs(
@@ -916,3 +930,31 @@ class Assessor(object):
             self.cur.execute(sql, row)
         print("<p>Saved {} Function signatures</p>".format(len(self.func_listing)))
         self.conn.commit()
+
+class CaptureOutput:
+    """A wrapper that redirects sys.stdout and sys.stderr to a string Buffer."""
+
+    def __init__(self, *args):
+        """Create the wrapper with either a new StringIO buffer or an existing one."""
+        if len(args) and isinstance(args[0], io.TextIOBase):
+            self._wrapper=args[0]
+        elif len(args)==0:
+            self._wrapper=io.StringIO()
+        else:
+            raise TypeError("CaptureOutput should either be initialised with a TextIOBase instance, or no argument.")
+        self._handles=None
+
+    def __enter__(self):
+        """Redirect sys.stdout and sys.stderr."""
+        self._handles=(sys.stdout,sys.stderr)
+        sys.stdout=self._wrapper
+        sys.stderr=self._wrapper
+        return self
+
+    def __exit__(self, type, value, traceback):
+        sys.stdout,sys.stderr=self._handles
+        if self._wrapper.seekable():
+            self._wrapper.seek(0)
+
+    def __str__(self):
+        return self._wrapper.getvalue()
