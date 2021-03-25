@@ -8,19 +8,22 @@ __all__ = [
     "result",
     "funcs",
     "assessor",
+    "filer",
     "Assessor",
     "ComputingClass",
     "Result",
     "read_user_data",
     "parse_code",
+    "file_work",
 ]
 
-__version__ = "2020.0.3"
+__version__ = "2020.0.4"
 
 from .assessor import Assessor
 from .cohort import ComputingClass
 from .funcs import parse_code, read_user_data
 from .result import Result
+from .filer import file_work
 
 if __name__ == "__main__":
     filename = "model_solution.py"

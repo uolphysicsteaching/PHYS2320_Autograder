@@ -111,6 +111,16 @@ class Assessor(object):
         """Should be implemented if necessary in sepcoifc subclass!"""
         return student_ans
 
+    def stylesheets(self):
+        "Return some style sheets or other header information."
+        ret="""<style>
+            .red {color: red; }
+            .orange {color: orange; }
+            .green {color: green; }
+            </style>"""
+        return ret
+
+
     def report_fixes(self):
         """Read the fixes.txt file and report and changes."""
         if self.fixes is not None:
@@ -129,6 +139,7 @@ class Assessor(object):
         <html>
         <head>
             <title>Report on {self.name} ({self.issid})</title>
+            {self.stylesheets()}
         </head>
         <body>
             <h1>Report on {self.name} ({self.issid})</h2>"""
@@ -511,7 +522,7 @@ class Assessor(object):
             for line in readme:
                 if line.strip().startswith("Original filename:"):
                     parts = line.strip().split(":")
-                    dest = parts[1].strip()
+                    dest = parts[1].lower().strip()
                 elif line.strip().startswith("Filename:"):
                     parts = line.strip().split(":")
                     src = parts[1].strip()
