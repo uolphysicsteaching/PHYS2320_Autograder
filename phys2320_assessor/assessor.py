@@ -13,7 +13,7 @@ import types
 import importlib
 from pathlib import Path
 
-import pylint
+from pylint.lint import Run as pylintRun
 from traceback import format_exc
 from time import perf_counter
 from inspect import getdoc, isclass, ismodule, getargspec, iscode, isfunction, getargs
@@ -112,7 +112,7 @@ class Assessor(object):
     def lint_code(self):
         """Run pylint over the code and report the global code score."""
         with CaptureOutput():
-            results=pylint.lint.Run(self.module.__file__,do_exit=False)
+            results=pylintRun(self.module.__file__,do_exit=False)
         print("<H2>Code quality Analysis</H2>")
         quality=results.linter.stats['global_note']*10
         print(f"<p>Pylint code quality: {round(quality,1)}%</p>")
