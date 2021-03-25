@@ -100,4 +100,5 @@ class Result(Variable):
             units=self.units
         if mode is None:
             mode="float" if units=="" else "eng"
-        return format_error(self.n,self.s,latex,mode,units,prefix)
+        latex = "latex" if latex else "html"
+        return format_error(self.n,self.s,fmt=latex,mode=mode,units=units,prefix=prefix)

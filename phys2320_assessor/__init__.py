@@ -15,7 +15,7 @@ __all__ = [
     "parse_code",
 ]
 
-__version__ = "2020.0.2"
+__version__ = "2020.0.3"
 
 from .assessor import Assessor
 from .cohort import ComputingClass
