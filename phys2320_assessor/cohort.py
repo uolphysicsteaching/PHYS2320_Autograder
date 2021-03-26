@@ -48,14 +48,14 @@ class ComputingClass(object):
 
     def __iter__(self):
         """Minimal iterator function to loop over sub directories rerturning Assessors."""
-        for i,d,do in enumerate(zip(self.subdirs,self.noskip)):
+        for i,(d,do) in enumerate(zip(self.subdirs,self.noskip)):
             r=self.student_class(d,self.db)
             r.do=do
             yield r
 
     def to_do(self):
         """Minimal iterator function to loop over sub directories rerturning Assessors."""
-        for i,d,do in enumerate(zip(self.subdirs,self.noskip)):
+        for i,(d,do) in enumerate(zip(self.subdirs,self.noskip)):
             r=self.student_class(d,self.db)
             if not do:
                 continue
