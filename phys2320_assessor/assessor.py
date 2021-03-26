@@ -12,6 +12,7 @@ import shutil
 import types
 import importlib
 from pathlib import Path
+import subprocess as proc
 
 from pylint.lint import Run as pylintRun
 from traceback import format_exc
@@ -73,7 +74,7 @@ class Assessor(object):
         self.code = None
         self.data = None
         self.fixes = None
-        self.calc_ansers=None
+        self.calc_answers={}
         self.mods = []
         self.files = []
         self.metadata = {}
@@ -120,7 +121,7 @@ class Assessor(object):
               to help the (human) graders evaluate your code.</p>""")
         stats=results.linter.stats
         quality=stats["global_note"]*10
-        print("<ul>")
+        print("<h3>Code Liniting statistics</h3>\n<ul>")
         print(f"<li>Pylint code quality score: {round(quality,1)}%</li>")
         print(f"<li>Number of warning detected: {stats['warning']}</li>")
         print(f"<li>Number of errors detected: {stats['error']}</li>")
@@ -129,6 +130,12 @@ class Assessor(object):
         print(f"<li>... of which undocumented: {round(100*stats['undocumented_function']/stats['function'],1)}%</li>")
         print(f"<li>Percentage of duplicated lines: {round(stats['percent_duplicated_lines'],1)}</li>")
         print("</ul>")
+        radon=proc.run(["bash","-c",f"radon cc --average {self.module.__file__}"],stdout=proc.PIPE, stderr=proc.PIPE)
+        print("<h3>Complexity Analysis</h3>")
+        print(radon.stdout.encode().replace("\n","<br/>\n"))
+        print("<h3>Maintainability index</h3>")
+        radon=proc.run(["bash","-c",f"radon mi  {self.module.__file__}"],stdout=proc.PIPE, stderr=proc.PIPE)
+        print(radon.stdout.encode().replace("\n","<br/>\n"))
 
 
     def sanitize_student_answers(self, student_ans):
@@ -609,7 +616,7 @@ class Assessor(object):
 
                 userfile = path.split(self.data)[-1]
                 stdfile = path.split(self.std_data)[-1]
-
+                self.calc_answers = self.get_calc_answers(path.join(self.subdir,userfile)) # Get model answers early
                 # Comence output
                 self.report_header()
                 self.report_fixes()
@@ -631,8 +638,7 @@ class Assessor(object):
                         msys = getattr(self.module, "sys")
                         msys.exit = raiseExit
                     # Change to the subdirectory becayse sine styudebts have hardcoded their data files
-                    calc_answers = self.get_calc_answers(userfile)
-                    self.calc_answers=calc_answers
+                    calc_answers=self.calc_answers
                     print("<h4>Running Student code</h4>")
                     sresults, self.student_time = self.run_code(
                         self.run_student, userfile
