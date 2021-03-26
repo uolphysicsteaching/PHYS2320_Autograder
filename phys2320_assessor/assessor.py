@@ -113,9 +113,13 @@ class Assessor(object):
 
     def lint_code(self):
         """Run pylint over the code and report the global code score."""
+        filename=os.path.basename(self.module.__file__)
+        cwd=os.getcwd()
+        os.chdir(os.path.dirname(self.module.__file__))
+
         with CaptureOutput():
-            results=pylintRun([self.module.__file__],do_exit=False)
-        print("<H2>Code quality Analysis</H2>")
+            results=pylintRun([filename],do_exit=False)
+        print(f"<H2>Code quality Analysis {filename}</H2>")
         print("""<p>These are the results from running an autmartic code analysis tool over your code. Just because this
               thinks something is a problem, does not mean you have been marked down for it. This information is provided
               to help the (human) graders evaluate your code.</p>""")
@@ -130,12 +134,21 @@ class Assessor(object):
         print(f"<li>... of which undocumented: {round(100*stats['undocumented_function']/stats['function'],1)}%</li>")
         print(f"<li>Percentage of duplicated lines: {round(stats['percent_duplicated_lines'],1)}</li>")
         print("</ul>")
-        radon=proc.run(["bash","-c",f"radon cc --average {self.module.__file__}"],stdout=proc.PIPE, stderr=proc.PIPE)
+        radon=proc.run(["bash","-c",f"radon cc --average {filename}"],stdout=proc.PIPE, stderr=proc.PIPE)
         print("<h3>Complexity Analysis</h3>")
-        print(radon.stdout.encode().replace("\n","<br/>\n"))
+        if len(radon.stdout)==0:
+            output=radon.stderr.decode()
+        else:
+            output=radon.stdout.decode()
+        print(output.replace("\n","<br/>\n"))
         print("<h3>Maintainability index</h3>")
-        radon=proc.run(["bash","-c",f"radon mi  {self.module.__file__}"],stdout=proc.PIPE, stderr=proc.PIPE)
-        print(radon.stdout.encode().replace("\n","<br/>\n"))
+        radon=proc.run(["bash","-c",f"radon mi  {filename}"],stdout=proc.PIPE, stderr=proc.PIPE)
+        if len(radon.stdout)==0:
+            output=radon.stderr.decode()
+        else:
+            output=radon.stdout.decode()
+        print(output.replace("\n","<br/>\n"))
+        os.chdir(cwd)
 
 
     def sanitize_student_answers(self, student_ans):
