@@ -63,7 +63,7 @@ class Assessor(object):
     stdfile_match = None
     stdfile_dir = "."
     student_files = "."
-    colors = ["LimeGreen", "Orchid", "OrangeRed", "Orange", "Orange"]
+    colors = ["LimeGreen", "Orchid", "OrangeRed", "Orange", "Orange","Orange", "Orange"]
 
     def __init__(self, subdir, dbconn=None):
         if path.isdir(subdir) and path.exists(path.join(subdir, "readme.txt")):
@@ -357,7 +357,7 @@ class Assessor(object):
             elif student_model and not student_correct and not model_correct:
                 ret = "Student and model answer agree but are not correct", 3
             elif not student_correct and not model_correct and not student_model:
-                ret = "Everyone is wrong and nothing agrees :-(", 3
+                ret = "Everyone is wrong and nothing agrees :-(", 6
             return ret
 
         else:
@@ -402,7 +402,7 @@ class Assessor(object):
                 3,
             )
         elif not student_correct and not model_correct and not student_model:
-            ret = "Everyone is wrong and nothing agrees :-(", 3
+            ret = "Everyone is wrong and nothing agrees :-(", 6
         return ret
 
     def compare_one_val(self, student, model_ans, calc_ans, key):
@@ -417,6 +417,8 @@ class Assessor(object):
         This function delegates processing of lists and dictionaries for recursive examination of the results.
         Student and model answers should be pre-processed to gather any flaoting point results into Result class instances.
         """
+        score=None
+        ret=False
         if student is None:  # No student answer available so can't mark it!
             print("<tr><td>{}</td><td colspan=4>No student answer supplied.</td></tr>")
             return None
@@ -427,26 +429,32 @@ class Assessor(object):
                 model_ans
             ):
                 print("<tr><td colpan =5>Answer is a list for {}</td></tr>".format(key))
+                sc=[]
                 for i, sa in enumerate(student):
-                    self.compare_one_val(
+                    sc.append(self.compare_one_val(
                         sa, model_ans[i], calc_ans[i], "{}[{}]".format(key, i)
-                    )
+                    ))
+                ret= np.all(sc)
+
             elif isinstance(student, (list, np.ndarray)):
                 print(
                     "<tr><td colpan=5>Answer is a list with more items than the model answer for {}</td></tr>".format(
                         key
                     )
                 )
+                sc=[]
                 for i, ma in enumerate(model_ans):
-                    self.compare_one_val(
+                    sc.append(self.compare_one_val(
                         student[i], ma, calc_ans[i], "{}[{}]".format(key, i)
-                    )
+                    ))
+                ret=np.all(sc)
             else:
                 print("<tr><td colpan=5>Expected a list for {}</td></tr>".format(key))
+                ret=False
         elif isinstance(model_ans, dict) and isinstance(
             student, dict
         ):  # Key is a dictionary
-            self.compare_dict(
+            ret = self.compare_dict(
                 student,
                 model_ans,
                 calc_ans,
@@ -477,6 +485,7 @@ class Assessor(object):
                     + repr(model_ans)
                 )
             message, score = self.three_way(student, model_ans, cval)
+            ret=score in [0,3]
             klass = self.colors[score]
             print(
                 "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td bgcolor='{}'>{}</td>".format(
@@ -486,6 +495,7 @@ class Assessor(object):
         elif isinstance(model_ans, str) and isinstance(student, str):
             message, score = self.three_way(student, model_ans, calc_ans)
             klass = self.colors[score]
+            ret=score in [0,3]
             print(
                 "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td bgcolor='{}'>{}</td>".format(
                     key, student, model_ans, calc_ans, klass, message
@@ -498,6 +508,8 @@ class Assessor(object):
                     key, type(model_ans)
                 )
             )
+            ret = False
+        return ret
 
     def compare_dict(self, student, model_ans, calc_ans, header=None):
         """Compare a dictionary of student and model answers and output as a rows of html table."""
@@ -511,15 +523,16 @@ class Assessor(object):
             )
             return
 
+        sc=[]
         for k in keys:
-            if k not in student:
+            if k not in student: # Completely missing key
                 print(
                     "<tr><td>{}</td><td colsp[an=4>No Student Answer</td></tr>".format(
                         k
                     )
                 )
                 continue
-            elif student[k] is None:  # Completely missing key
+            elif student[k] is None:
                 print(
                     "<tr><td>{}</td><td colsp[an=4>Student Answered None</td></tr>".format(
                         k
@@ -541,7 +554,10 @@ class Assessor(object):
                         )
                     )
                     continue
-            self.compare_one_val(student[k], model_ans[k], calc_ans[k], k)
+            sc.append(self.compare_one_val(student.get(k,None), model_ans.get(k,None), calc_ans.get(k,None), k))
+        score = np.all(sc)
+        return score
+
 
     def compare(self, student, model_ans, calc_ans):
         """Compares the results for the student and model answers."""
@@ -551,8 +567,9 @@ class Assessor(object):
         print(
             "<table><tr><th>Parameter</th><th>Student Answer</th><th>Model Answer</th><th>Actual Answer</th><th>Comment</th></tr>"
         )
-        self.compare_dict(student, model_ans, calc_ans)
+        score = self.compare_dict(student, model_ans, calc_ans)
         print("</table>")
+        return score
 
     def get_info(self):
         """Read the readme.txt file and the directory lsiting to find the data file and python code
@@ -697,12 +714,14 @@ class Assessor(object):
                     sresults, self.student_time = self.run_code(
                         self.run_student, stdfile
                     )
-                    if run_1_sresult == sresults:
-                        print("<h3>Hardcoded File path?</h3>")
+                    with CaptureOutput():
+                        sc= self.compare(run_1_sresult,sresults, calc_answers)
+                    if sc:
+                        print("<h3>Student returned same aswers for reference code - hardcoded File path?</h3>")
                         print(
                             """<p>The student's solutions for their data file and the reference data file appear to
                         give the same answer. Possibly they've hardcoded a path somewhere and are really analysing the same
-                        data twice.</p>"""
+                        data twice. If they have -0.5 grades on robustness</p>"""
                         )
                     self.save_figs("Standard_Data_Figure-{}.png", "Student Code")
                     print("<h4>Running Model Solution code</h4>")
@@ -735,13 +754,13 @@ class Assessor(object):
             except excp.NoDataError as err:
                 print("{}\n</body></html>".format(err))
                 (sys.stdout, sys.stderr) = restore
-                print("\nHit exception {}\n".format(err))
+                print(f"Hit exception {err} for {self.name} ({self.issid})")
             except Exception as err:
                 print(format_exc().replace("\n", "<br/>\n"))
                 print("</body></html>")
                 plt.close("all")
                 (sys.stdout, sys.stderr) = restore
-                print("Hit exception {}".format(err))
+                print(f"Hit exception {err} for {self.name} ({self.issid})")
 
             else:
                 (sys.stdout, sys.stderr) = restore

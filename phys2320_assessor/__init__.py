@@ -17,7 +17,7 @@ __all__ = [
     "file_work",
 ]
 
-__version__ = "2020.0.11"
+__version__ = "2020.0.12"
 
 from .assessor import Assessor
 from .cohort import ComputingClass
