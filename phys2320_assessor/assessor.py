@@ -13,6 +13,7 @@ import types
 import importlib
 from pathlib import Path
 import subprocess as proc
+import sqlite3
 
 from pylint.lint import Run as pylintRun
 from traceback import format_exc
@@ -79,6 +80,22 @@ class Assessor(object):
         self.files = []
         self.metadata = {}
         (self.conn, self.cur) = dbconn
+
+
+    def __getstate__(self):
+        """Remove the sqlite3 connection information for pickling."""
+        state=self.__dict__.copy()
+        for k in ["conn","cur","module","run_student"]:
+            state.pop(k,None)
+        return state
+
+    def __setstate__(self,state):
+        """Restore my state from a directory."""
+        self.__dict__.update(state)
+        self.conn=sqlite3.connect("func_sigs.db")
+        self.cur=self.conn.cursor()
+
+
 
     ###################################################################################
     ##### Methods to define for each year's problem ###################################
@@ -642,6 +659,7 @@ class Assessor(object):
                 if self.module is None:
                     print("<hr/>")
                     print("<h2>Manual Checking of code required !</h2>")
+                    raise excp.NoCdeError("No student code module located")
                 else:
                     plt.show = replace_show
                     if "sys" in dir(self.module):
@@ -917,6 +935,7 @@ class Assessor(object):
                     "<h2>Unable to locate required ProcessData function. Check manually</h2>"
                 )
                 self.module = None
+                raise excp.NoProcessDataError("Unable to locate ProcessData function")
             else:
                 args, vargs, vkwargs = getargs(self.module.ProcessData.__code__)
                 if (
@@ -929,6 +948,7 @@ class Assessor(object):
                         "<h2>ProcessData should take just one argument called 'filename' - check manually</h2>"
                     )
                     self.module = None
+                    raise excp.BadProcessDataError("ProcessData had a bad signature!")
                 else:  # Ok we're good to go !
                     self.run_student = self.module.ProcessData
         except ImportError as err:
@@ -951,6 +971,7 @@ class Assessor(object):
             )
             print(format_exc())
             self.module = None
+            raise err
         finally:
             os.chdir(back)
 
