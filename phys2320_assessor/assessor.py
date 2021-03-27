@@ -308,6 +308,7 @@ class Assessor(object):
                 )
             results = {}
             dt = 1e-9
+            raise excp.StudentCodeError("Student code threw and error !")
         return results, dt
 
     def save_figs(self, pattern, title, prefix="<h3>Figures from {}</h3>"):
@@ -571,6 +572,23 @@ class Assessor(object):
         print("</table>")
         return score
 
+    def show_code(self):
+        """Print/lint the code."""
+        print("<h1>Student Code</h1>")
+        try:
+            self.lint_code()
+            lexer = pygments.lexers.get_lexer_by_name("Python")
+            formatter = pygments.formatters.html.HtmlFormatter(
+                noclasses=True, linenos=True, style="xcode"
+            )
+        except:
+            print("<p>Failed to check code complexity.</p>")
+        try:
+            code = Path(Path(self.code).name).read_text()
+            print(pygments.highlight(code, lexer, formatter))
+        except:
+            print("<p>Couldn't even show the code !</p>")
+
     def get_info(self):
         """Read the readme.txt file and the directory lsiting to find the data file and python code
         in the student submission."""
@@ -743,20 +761,16 @@ class Assessor(object):
                     print("<h2>Student Code Structure</h2>")
                     self.get_func_details()
                     self.save_func_details()
-                    print("<h1>Student Code</h1>")
-                    self.lint_code()
-                    lexer = pygments.lexers.get_lexer_by_name("Python")
-                    formatter = pygments.formatters.html.HtmlFormatter(
-                        noclasses=True, linenos=True, style="xcode"
-                    )
-                    code = Path(Path(self.code).name).read_text()
-                    print(pygments.highlight(code, lexer, formatter))
+                    self.show_code()
             except excp.NoDataError as err:
-                print("{}\n</body></html>".format(err))
+                print("{err.replace('\n','<br/>')}\n")
+                self.show_code()
+                print("</body></html>")
                 (sys.stdout, sys.stderr) = restore
                 print(f"Hit exception {err} for {self.name} ({self.issid})")
             except Exception as err:
                 print(format_exc().replace("\n", "<br/>\n"))
+                self.show_code()
                 print("</body></html>")
                 plt.close("all")
                 (sys.stdout, sys.stderr) = restore
