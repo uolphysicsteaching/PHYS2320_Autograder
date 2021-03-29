@@ -14,6 +14,7 @@ import importlib
 from pathlib import Path
 import subprocess as proc
 import sqlite3
+import glob
 
 from pylint.lint import Run as pylintRun
 from traceback import format_exc
@@ -21,6 +22,8 @@ from time import perf_counter
 from inspect import getdoc, isclass, ismodule, getargspec, iscode, isfunction, getargs
 from zlib import crc32
 import pygments
+import weasyprint as wprnt
+from PyPDF2 import PdfFileMerger, PdfFileReader
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -67,7 +70,7 @@ class Assessor(object):
 
     def __init__(self, subdir, dbconn=None):
         if path.isdir(subdir) and path.exists(path.join(subdir, "readme.txt")):
-            self.subdir = subdir
+            self.subdir = os.path.realpath(subdir)
         else:
             raise IOError("{} Not a student submission !".format(subdir))
         self.name = None
@@ -76,6 +79,7 @@ class Assessor(object):
         self.data = None
         self.fixes = None
         self.calc_answers={}
+        self.pdfs=[]
         self.mods = []
         self.files = []
         self.metadata = {}
@@ -130,9 +134,12 @@ class Assessor(object):
 
     def lint_code(self):
         """Run pylint over the code and report the global code score."""
-        filename=os.path.basename(self.module.__file__)
         cwd=os.getcwd()
-        os.chdir(os.path.dirname(self.module.__file__))
+        if os.path.exists(os.path.basename(self.code)):
+            pass
+        else:
+            os.chdir(os.path.dirname(self.code))
+        filename=os.path.basename(self.code)
 
         with CaptureOutput():
             results=pylintRun([filename],do_exit=False)
@@ -178,7 +185,14 @@ class Assessor(object):
             .red {color: red; }
             .orange {color: orange; }
             .green {color: green; }
-            </style>"""
+            body {width: 1280px;}
+            @page {
+              size: A4; /* Change from the default size of A4 */
+              margin: 2cm; /* Set margin on each page */
+            }
+            </style>
+            <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lato">
+            """
         return ret
 
 
@@ -212,6 +226,12 @@ class Assessor(object):
             f"""
             <table><tr>
             <td>Data File</td><td>{self.data}</td>
+            </tr>"""
+        )
+        print(
+            f"""
+            <tr>
+            <td>Code File</td><td>{self.code}</td>
             </tr>"""
         )
         print("<tr><td colspabn=2><h2>User Supplied Data Settings</h2></td></tr>")
@@ -577,17 +597,21 @@ class Assessor(object):
         print("<h1>Student Code</h1>")
         try:
             self.lint_code()
+        except Exception as err:
+            print(f"<p>Failed to check code complexity {err}.</p>")
+        try:
             lexer = pygments.lexers.get_lexer_by_name("Python")
             formatter = pygments.formatters.html.HtmlFormatter(
                 noclasses=True, linenos=True, style="xcode"
             )
-        except:
-            print("<p>Failed to check code complexity.</p>")
-        try:
-            code = Path(Path(self.code).name).read_text()
+
+            if Path(self.code).exists():
+                code=Path(self.code).read_text()
+            else:
+                code = Path(Path(self.code).name).read_text()
             print(pygments.highlight(code, lexer, formatter))
-        except:
-            print("<p>Couldn't even show the code !</p>")
+        except Exception as err:
+            print(f"<p>Couldn't even show the code !: {err}</p>")
 
     def get_info(self):
         """Read the readme.txt file and the directory lsiting to find the data file and python code
@@ -627,15 +651,19 @@ class Assessor(object):
         for f in os.listdir(self.subdir):
             ff = f.strip().lower()
             if ff == self.issid + ".py" or ff == "temp_{}.py".format(self.issid):
-                self.code = path.join(self.subdir, f)
+                self.code = path.realpath(path.join(self.subdir, f))
             elif ff.endswith(".py"):  # Other modules
                 self.mods.append(f)
             elif ff == "fixes.txt":
-                self.fixes = path.join(self.subdir, f)
+                self.fixes = path.realpath(path.join(self.subdir, f))
             elif (
                 ff.endswith(".csv") or ff.endswith(".dat") or ff.endswith(".txt")
             ) and ff in self.files:
-                self.data = path.join(self.subdir, f)
+                self.data = path.realpath(path.join(self.subdir, f))
+        self.pdfs=[os.path.basename(f) for f in glob.glob(os.path.join(self.subdir,"*.pdf"))]
+        for f in ["_results.pdf","results.pdf"]:
+            if f in self.pdfs:
+                self.pdfs.remove(f)
         if self.data is None:
             raise excp.NoDataError(
                 "<h2>Error ! Could not locate data</h2><h2>Manual Checking Required</h2>"
@@ -653,7 +681,7 @@ class Assessor(object):
                 len(filenames) == 1
             ):  # Yes, one file so rename it, set self.code and get out
                 shutil.copy(filenames[0], "temp_{}.py".format(self.issid))
-                self.code = path.join(self.subdir, "temp_{}".format(self.issid))
+                self.code = path.realpath(path.join(self.subdir, "temp_{}".format(self.issid)))
                 return True
             # If we get here then we can't work out what the student has done
             raise excp.NoDataError(
@@ -1018,6 +1046,25 @@ class Assessor(object):
             self.cur.execute(sql, row)
         print("<p>Saved {} Function signatures</p>".format(len(self.func_listing)))
         self.conn.commit()
+
+    def create_pdf(self):
+        """Convert results.html to results.pdf and combine with other pdf files."""
+        try:
+            dest=path.join(self.subdir,"_results.pdf")
+            src=path.join(self.subdir,"results.html")
+            wprnt.HTML(src).write_pdf(dest)
+            self.files.insert(0,"_results.pdf")
+
+            mergedObject = PdfFileMerger()
+
+            for filename in self.files:
+                mergedObject.append(PdfFileReader(path.join(self.subdir,filename), 'rb'))
+
+            mergedObject.write("result.pdf")
+        except Exception as err:
+            print(f"{self.name} ({self.issid}) pdf conversion error:\n{err}\n{format_exc()}")
+
+
 
 class CaptureOutput:
     """A wrapper that redirects sys.stdout and sys.stderr to a string Buffer."""

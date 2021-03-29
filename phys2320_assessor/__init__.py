@@ -15,15 +15,18 @@ __all__ = [
     "read_user_data",
     "parse_code",
     "file_work",
+    "zip",
+    "zip_work"
 ]
 
-__version__ = "2020.0.13"
+__version__ = "2020.1.0"
 
 from .assessor import Assessor
 from .cohort import ComputingClass
 from .funcs import parse_code, read_user_data
 from .result import Result
 from .filer import file_work
+from .zip import zip_work
 
 if __name__ == "__main__":
     filename = "model_solution.py"

@@ -20,12 +20,18 @@ requirements:
     - matplotlib>=3.0
     - uncertainties
     - pylint >2.6
+    - pypdf2
+    - weasyprint
+    - radon
   run:
     - python
     - numpy>=1.18
     - matplotlib>=3.0
     - uncertainties
     - pylint >2.6
+    - pypdf2
+    - weasyprint
+    - radon
 
 about:
   home: {{ data.get('url') }}
