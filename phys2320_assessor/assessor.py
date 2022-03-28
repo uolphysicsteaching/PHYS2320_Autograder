@@ -92,6 +92,7 @@ class Assessor(object):
         self.files = []
         self.metadata = {}
         (self.conn, self.cur) = dbconn
+        self._exception=None
 
 
     def __getstate__(self):
@@ -825,6 +826,7 @@ class Assessor(object):
                 self.show_code()
                 print("</body></html>")
                 (sys.stdout, sys.stderr) = restore
+                self._exception=err
                 print(f"Hit exception {err} for {self.name} ({self.issid})")
             except Exception as err:
                 print(format_exc().replace("\n", "<br/>\n"))
@@ -832,6 +834,7 @@ class Assessor(object):
                 print("</body></html>")
                 plt.close("all")
                 (sys.stdout, sys.stderr) = restore
+                self.exception=err
                 print(f"Hit exception {err} for {self.name} ({self.issid})")
 
             else:

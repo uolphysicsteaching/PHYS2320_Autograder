@@ -42,6 +42,8 @@ class Inspector(ast.NodeVisitor):
                 raise excp.RawInputFound("The code used the input() function outside the if __name__=='__main__' block. This is likely to cause the grader to crash.")
 
     def visit_FunctionDef(self, node):
+        if not hasattr(node,"name"):
+            return
         self.func_name.append(node.name)
         if node.name=="ProcessData":
             if len(node.args.args) != 1 or node.args.args[0].arg!="filename":
@@ -54,12 +56,16 @@ class Inspector(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_arguments(self, node):
+        if not hasattr(node,"args"):
+            return
         for arg in node.args:
             if arg.arg in dir(__builtin__):
                 print(f"<li>A builtin python name {arg.arg} is being redefined as a parameter to a function.</li>")
         self.generic_visit(node)
 
     def visit_Attribute(self, node):
+        if not hasattr(node,"attr"):
+            return
         if node.attr == "close" and isinstance(node.ctx, ast.Load):
             self.closes = True
             self.double_cosed = True
@@ -67,10 +73,14 @@ class Inspector(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_If(self, node):
+        if not hasattr(node,"test"):
+            return
         if not (isinstance(node.test,ast.Expr) and node.test.left.id=="__name__" and isinstance(node.test.comparators[0],ast.Str) and node.test.comparators[0].s=="__main__"):
             self.generic_visit(node) # If this If is not the guard at the end of the script continue processing
 
     def visit_Assign(self, node):
+        if not hasattr(node,"targs"):
+            return
         for target in node.targets:
             if hasattr(target, "id") and target.id in dir(__builtin__):
                 self.uses_builtin |= set([target.id])
@@ -87,6 +97,8 @@ class Inspector(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_withitem(self, node):
+        if not hasattr(node,"options") or not hasattr(node,"optional_vargs"):
+            return
         if node.optional_vars is not None:
             if node.optional_vars.id in dir(__builtins__):
                 self.uses_builtin |= set([node.optional_vars.id])
@@ -94,10 +106,15 @@ class Inspector(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_Call(self, node):
+        if not hasattr(node,"func"):
+            return self.generic_visit(node)
         try:
             call_name = node.func.id
         except AttributeError:
-            call_name = node.func.attr
+            try:
+                call_name = node.func.attr
+            except AttributeError:
+                return self.generic_visit(node)
         if call_name == "input":
             self.input = True
             print("<li>Use of input detected, this is liable to cause the checker problems.</li>")
