@@ -10,7 +10,7 @@ import re
 
 issid=re.compile(r"[a-z]{2}[0-9]{2}[a-z0-9]+")
 
-def zip_work(directory="Student Work"):
+def zip_work(directory="Student Work", clobber=False):
     """Zip the student work folders up to zips named by ISSID."""
     os.chdir(directory)
 
@@ -21,7 +21,7 @@ def zip_work(directory="Student Work"):
             print(f"{d} failed to find issid, skipping")
             continue
         zf=match.group(0)+".zip"
-        if not path.exists(zf):
+        if not path.exists(zf) or clobber:
             with zipfile.ZipFile(zf,"w") as zip:
                 for f in os.listdir(d):
                     zip.write(path.join(d,f))

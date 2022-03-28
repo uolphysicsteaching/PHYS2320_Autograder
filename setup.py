@@ -6,7 +6,8 @@ def version():
     for line in p.read_text().split("\n"):
         line=line.strip()
         if line.startswith("__version__"):
-            return line.split("=")[1]
+            vers=line.split("=")[1].strip(' "')
+            return vers
 
 
 with open("README.md", "r", encoding="utf-8") as fh:

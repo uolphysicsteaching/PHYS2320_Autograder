@@ -1,41 +1,45 @@
 {% set data = load_setup_py_data() %}
+{% set version = "2021.1.0" %}
 
 package:
   name: "phys2320_assessor"
-  version: {{ data.get('version') }}
+  version: "{{ version }}"
 
 source:
-  git_tag: main
-  git_url: git@github.com:uolphysicsteaching/PHYS2320_Autograder.git
+    path: ..
+
 build:
-  number: 1
-  script: {{ PYTHON }} setup.py install --single-version-externally-managed --record=record.txt
+  number: 0
+  script: "{{ PYTHON }} -m pip install . -vv"
 
 requirements:
-  build:
-    - python
   host:
+    - pip
+    - numpy
+    - scipy
+    - matplotlib
+    - sqlite
+    - pylint
+    - pygments
     - python
-    - numpy>=1.18
-    - matplotlib>=3.0
-    - uncertainties
-    - pylint >2.6
-    - pypdf2
-    - weasyprint
-    - radon
   run:
+    - numpy
+    - scipy
+    - matplotlib
+    - sqlite
+    - pylint
+    - pygments
     - python
-    - numpy>=1.18
-    - matplotlib>=3.0
-    - uncertainties
-    - pylint >2.6
-    - pypdf2
+    - pygments
     - weasyprint
-    - radon
+    - pypdf2
+    - uncertainties
 
 about:
-  home: {{ data.get('url') }}
-  license: BSD 3 Clause License
+  home: "https://github.com/uolphysicsteaching/PHYS2320_Autograder"
+  license: "OSI Approved :: BSD 3 clause License"
   license_family: BSD
-  license_file: ''
-  summary: {{ data.get('description') }}
+  license_file: LICENSE
+  summary: "A tool for assessing Leeds physics student python coursework."
+  doc_url:
+  dev_url:

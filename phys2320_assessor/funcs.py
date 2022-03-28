@@ -4,12 +4,115 @@
 from collections.abc import Iterable
 import ast
 from inspect import isfunction, getmodule
+import builtins as __builtin__
 
 import numpy as np
 import matplotlib
 from numbers import Number
 
 from . import exceptions as excp
+
+class Inspector(ast.NodeVisitor):
+    def __init__(self, *args, **kargs):
+        self.closes = False
+        self.uses_with = False
+        self.returns = False
+        self.input = False
+        self.prints = False
+        self.func_name = []
+        self.open_args = None
+        self.has_open = False
+        self.hard_coded = False
+        self.double_closed = False
+        self.globals = False
+        self.uses_builtin = set()
+        self.split_parameter = True
+        self.split_constant = False
+        self.processdata = False
+
+        if len(args) > 0 and isinstance(args[0], str):
+            with open(args[0], "r", errors="ignore") as mod_file:
+                self.tree = ast.parse(mod_file.read())
+                print("<h3>Notes form inspecting the code.</h3>\n<ul>")
+                self.visit(self.tree)
+                print("</ul>\n<p>Finsihed checking Student code for potential issues.</p>")
+            if not self.processdata:
+                raise excp.NoProcessDataError("ProcessData function either not found or not defined correctly - autograder will fail!")
+            if self.input:
+                raise excp.RawInputFound("The code used the input() function outside the if __name__=='__main__' block. This is likely to cause the grader to crash.")
+
+    def visit_FunctionDef(self, node):
+        self.func_name.append(node.name)
+        if node.name=="ProcessData":
+            if len(node.args.args) != 1 or node.args.args[0].arg!="filename":
+                print(
+                    "<li>The <b>ProcessData</b> function is not correctly defined.</li>"
+                )
+            else:
+                self.processdata=True
+
+        self.generic_visit(node)
+
+    def visit_arguments(self, node):
+        for arg in node.args:
+            if arg.arg in dir(__builtin__):
+                print(f"<li>A builtin python name {arg.arg} is being redefined as a parameter to a function.</li>")
+        self.generic_visit(node)
+
+    def visit_Attribute(self, node):
+        if node.attr == "close" and isinstance(node.ctx, ast.Load):
+            self.closes = True
+            self.double_cosed = True
+            print("<li>Manually closing the file is either double closing it or not using the with....: construct</li>")
+        self.generic_visit(node)
+
+    def visit_If(self, node):
+        if not (isinstance(node.test,ast.Expr) and node.test.left.id=="__name__" and isinstance(node.test.comparators[0],ast.Str) and node.test.comparators[0].s=="__main__"):
+            self.generic_visit(node) # If this If is not the guard at the end of the script continue processing
+
+    def visit_Assign(self, node):
+        for target in node.targets:
+            if hasattr(target, "id") and target.id in dir(__builtin__):
+                self.uses_builtin |= set([target.id])
+                print(f"<li>Assigning a value to the builtin name {target.id} is probably not a good idea.</li>")
+        self.generic_visit(node)
+
+    def visit_With(self, node):
+        self.closes = True
+        self.uses_with = True
+        self.generic_visit(node)
+
+    def visit_Global(self, node):
+        print("<li>The code used global variables. This is bad and leads to buggy code and is not necessary for this code. Subtract 1 grade from structure unless already taken account of.</li>")
+        self.generic_visit(node)
+
+    def visit_withitem(self, node):
+        if node.optional_vars is not None:
+            if node.optional_vars.id in dir(__builtins__):
+                self.uses_builtin |= set([node.optional_vars.id])
+                print(f"<li>Assigning a value to the builtin name {node.optional_vars.id} i the with statement is probably not a good idea.</li>")
+        self.generic_visit(node)
+
+    def visit_Call(self, node):
+        try:
+            call_name = node.func.id
+        except AttributeError:
+            call_name = node.func.attr
+        if call_name == "input":
+            self.input = True
+            print("<li>Use of input detected, this is liable to cause the checker problems.</li>")
+        if call_name == "print":
+            print("<li>Code uses print  but there's no screeen to print to!</li>")
+            self.prints = True
+        if call_name == "open":
+            self.has_open = True
+            if not self.uses_with:
+                print("<li>Detected an open() not inside a with...: - not recommended!</li>")
+            self.open_args = len(node.args)
+            if self.open_args > 0 and isinstance(node.args[0], ast.Str):
+                self.hard_coded = True
+                print("<li>Code is calling open with a string constant - likely to be hard coded path</li>")
+        self.generic_visit(node)
 
 
 def format_error(value, error, fmt="text", mode="float", units="", prefix=""):
@@ -118,7 +221,7 @@ def format_error(value, error, fmt="text", mode="float", units="", prefix=""):
         raise RuntimeError("Unrecognised mode: {} in format_error".format(mode))
 
     # Now do the rounding of the value based on error to 1 s.f.
-    if error != 0.0 and not np.isnan(error):
+    if error != 0.0 and not np.isnan(error) and not np.isinf(error):
         e2 = error
         u_mag = np.floor(np.log10(abs(error)))  # work out the scale of the error
         error = (
@@ -135,8 +238,10 @@ def format_error(value, error, fmt="text", mode="float", units="", prefix=""):
     units = units.replace("{", "{{").replace("}", "}}")
     prefix = prefix.replace("{", "{{").replace("}", "}}")
     if fmt == "latex":  # Switch to latex math mode symbols
-        if error != 0.0 and not np.isnan(error):
+        if error != 0.0 and not np.isnan(error) and not np.isinf(error):
             val_fmt_str = r"${}{{:.{}f}}\pm ".format(prefix, int(abs(u_mag)))
+        elif np.isinf(error):
+            val_fmt_str = r"${}{{}}\pm\infty".format(prefix)
         else:
             val_fmt_str = r"${}{{}}".format(prefix)
         if units != "":
@@ -145,8 +250,10 @@ def format_error(value, error, fmt="text", mode="float", units="", prefix=""):
             suffix_fmt = ""
         suffix_fmt += "$"
     elif fmt == "html":  # HTML
-        if error != 0.0 and not np.isnan(error):
+        if error != 0.0 and not np.isnan(error) and not np.isinf(error):
             val_fmt_str = r"{}{{:.{}f}}&plusmn;".format(prefix, int(abs(u_mag)))
+        elif np.isinf(error):
+            val_fmt_str = r"{}{{}}&plusmn;&infin;".format(prefix)
         else:
             val_fmt_str = r"{}{{}}".format(prefix)
         suffix_fmt = units
@@ -154,17 +261,19 @@ def format_error(value, error, fmt="text", mode="float", units="", prefix=""):
         val_fmt_str = r"{}{{}}".format(prefix)
         suffix_fmt = units
     if (
-        error != 0.0 and not np.isnan(error)
+        error != 0.0 and not np.isnan(error) and not np.isinf(error)
     ) and u_mag < 0:  # the error is less than 1, so con strain decimal places
         err_fmt_str = r"{:." + str(int(abs(u_mag))) + "f}"
     elif error != 0.0 and not np.isnan(
         error
-    ):  # We'll be converting it to an integer anyway
+    ) and not np.isinf(error):  # We'll be converting it to an integer anyway
         err_fmt_str = r"{}"
+    elif np.isinf(error) and fmt not in ["html","latex"]:
+        err_fmt_str="+/-inf"
     else:
         err_fmt_str = ""
     fmt_str = val_fmt_str + err_fmt_str + suffix_val + suffix_fmt
-    if error >= 1.0:
+    if error >= 1.0 and not np.isinf(error):
         error = int(error)
         value = int(value)
     if error != 0.0 and not np.isnan(error):
@@ -197,39 +306,11 @@ def open_figures():
 def parse_code(filename):
     """Read the source code and try to parse."""
     try:
-        with open(filename, "r", encoding="utf-8", errors="backslashreplace") as code:
-            source = code.read()
+        Inspector(filename)
     except Exception as err:
         raise IOError(
             f"Failed to open source code to check for dangerouts functions. Error was {err}"
         )
-    nodes = ast.parse(source, filename)
-    for stmt in ast.walk(nodes):
-        if (
-            isinstance(stmt, ast.FunctionDef) and stmt.name == "ProcessData"
-        ):  # Check args
-            if len(stmt.args.args) == 1:
-                break
-            else:
-                raise excp.NoProcessDataError(
-                    "The <b>ProcessData</b> function is not correctly defined."
-                )
-    else:
-        raise excp.NoProcessDataError(
-            "No <b>def ProcessData</b> found in code - not in template?"
-        )
-
-    for stmt in ast.walk(nodes):
-        if (
-            isinstance(stmt, ast.Call)
-            and isinstance(stmt.func, ast.Name)
-            and stmt.func.id == "input"
-        ):
-            break
-    else:
-        return True
-    raise excp.InputUsedError("Found an instance of <b>input</b> in code.")
-
 
 def is_number(dictionary, key):
     return key in dictionary and isinstance(dictionary[key], Number)
@@ -294,3 +375,22 @@ def read_user_data(datafile):
 def is_mod_function(func, mod):
     """Utility function to check if a module is actually defining a functuion."""
     return isfunction(func) and getmodule(func) == mod
+
+def get_globals():
+    """Return a dictionary of dlobal variables."""
+    return {k:v for k,v in globals().items() if not k.startswith("_")}
+
+def compare_dicts(dict1,dict2):
+    """Compare to two dictionaries to see what cahnged."""
+    ret={}
+    #Comapre common keys:
+    for k in set(dict1) & set(dict2):
+        if dict1[k]!=dict2[k]:
+            ret[k]=(dict1[k],dict2[k])
+    # In dict1 and not in dict2
+    for k in set(dict1)-set(dict2):
+        ret[k]=(dict1[k],None)
+    # In dict2 and not in dict1
+    for k in set(dict2)-set(dict1):
+        ret[k]=(None,dict2[k])
+    return False if len(ret)==0 else ret

@@ -72,11 +72,11 @@ def process_file(f, clobber):
     if path.exists(f):
         os.unlink(f) # Remove the readme file if it exists
 
-def file_work(ASSIGNMENT_DOWNLOAD,SUBMISSIION_PATTERN, clobber=True):
+def file_work(ASSIGNMENT_DOWNLOAD,SUBMISSIION_PATTERN, clobber=True, directory="Student Work"):
     """ Run the filing script."""
 
-    os.makedirs("Student Work",exist_ok=True)
-    os.chdir("Student Work")
+    os.makedirs(directory,exist_ok=True)
+    os.chdir(directory)
 
     for zipf in glob.glob(ASSIGNMENT_DOWNLOAD):
         with zipfile.ZipFile(zipf,mode="r") as downloaded:

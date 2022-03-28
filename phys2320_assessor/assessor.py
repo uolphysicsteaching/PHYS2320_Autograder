@@ -15,6 +15,7 @@ from pathlib import Path
 import subprocess as proc
 import sqlite3
 import glob
+from pprint import pformat
 
 from pylint.lint import Run as pylintRun
 from traceback import format_exc
@@ -22,8 +23,13 @@ from time import perf_counter
 from inspect import getdoc, isclass, ismodule, getargspec, iscode, isfunction, getargs
 from zlib import crc32
 import pygments
-import weasyprint as wprnt
-from PyPDF2 import PdfFileMerger, PdfFileReader
+try:
+    import weasyprint as wprnt
+    from PyPDF2 import PdfFileMerger, PdfFileReader
+except (ImportError, OSError):
+    wprint=None
+    PdfFileMerger=None
+    PdfFileReader=None
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -38,6 +44,8 @@ from .funcs import (
     raiseExit,
     parse_code,
     is_mod_function,
+    get_globals,
+    compare_dicts
 )
 
 
@@ -254,6 +262,11 @@ class Assessor(object):
             "_error"
         ):  # Do nothing with keys that look like they contain errors
             return entry
+        if isinstance(entry,np.ndarray):
+            if entry.size==1:
+                entry=entry.ravel()[0]
+            else:
+                entry=list(entry.ravel())
         if isinstance(entry, dict):
             if not isinstance(template, dict):
                 template = {}
@@ -277,8 +290,6 @@ class Assessor(object):
                 error = entries["{}_error".format(k)]
             else:
                 error = 0.0
-            if error is not None and error < 0.0:
-                error = abs(error)
             entries[k] = Result(entry, error)
         elif isinstance(entry, str):
             try:
@@ -716,8 +727,16 @@ class Assessor(object):
                 self.report_settings(user_settings)
 
                 print("<h2>Importing the Student Module</h2>")
+                before_import=get_globals()
                 self.do_import()
                 plt.close("all")
+                new_globals=compare_dicts(before_import, get_globals())
+                if new_globals:
+                    print("<h3>New Global Variables added!</h3>")
+                    print(f"""<p>Importing the code should not introduce new global variables. This implies that some
+                          code has executed and has used global variables. If so, -1 grades on structure.<p>
+                          <pre>{pformat(new_globals,indent=4)}</pre>""")
+
                 os.chdir(self.subdir)
                 if self.module is None:
                     print("<hr/>")
@@ -734,6 +753,8 @@ class Assessor(object):
                     # Change to the subdirectory becayse sine styudebts have hardcoded their data files
                     calc_answers=self.calc_answers
                     print("<h4>Running Student code</h4>")
+                    before_import=get_globals()
+
                     sresults, self.student_time = self.run_code(
                         self.run_student, userfile
                     )
@@ -770,6 +791,14 @@ class Assessor(object):
                         data twice. If they have -0.5 grades on robustness</p>"""
                         )
                     self.save_figs("Standard_Data_Figure-{}.png", "Student Code")
+                    new_globals=compare_dicts(before_import, get_globals())
+                    if new_globals:
+                        print("<h3>New Global Variables added!</h3>")
+                        print(f"""<p>Running the code should not introduce new global variables. This implies that some
+                              code has executed and has used global variables. If so, -1 grades on structure if not
+                              already taken off from the import.<p>
+                              <pre>{pformat(new_globals,indent=4)}</pre>""")
+
                     print("<h4>Running Model Solution code</h4>")
 
                     dresults, self.model_time = self.run_code(self.run_model, stdfile)
@@ -791,7 +820,8 @@ class Assessor(object):
                     self.save_func_details()
                     self.show_code()
             except excp.NoDataError as err:
-                print("{err.replace('\n','<br/>')}\n")
+                err_string=str(err).replace("\n","<br/>\n")
+                print(err_string)
                 self.show_code()
                 print("</body></html>")
                 (sys.stdout, sys.stderr) = restore

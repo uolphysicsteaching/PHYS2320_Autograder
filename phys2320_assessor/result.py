@@ -4,6 +4,7 @@ Created on Fri Mar 19 17:18:02 2021
 
 @author: phygbu
 """
+from collections.abc import Iterable
 
 from uncertainties.core import Variable,AffineScalarFunc
 
@@ -28,6 +29,23 @@ def mk_answer(ans, key, units=None, fmt="text"):
         )
     return Result(val, err, units=units, fmt=fmt)
 
+def _fix_val(v,s):
+    """Try to ensure that v and s are both floats ad s is positive."""
+
+    if isinstance(v,Iterable) and len (v)==2:
+        v,s=v[0],v[1]
+    while isinstance(s,Iterable) and not isinstance(s,str):
+        s=s[0] # Un wrap 2 to get the first value
+
+    while isinstance(v,Iterable) and not isinstance(v,str):
+        v=v[0] # and unwrap the value
+
+    s=abs(float(s))
+    v=float(v)
+
+    return v,s
+
+
 class Result(Variable):
     """A subclass of the uncertainities Variable type for holding answers with uncertainities."""
 
@@ -49,8 +67,7 @@ class Result(Variable):
             s=v.s
             v=v.n
 
-        v=float(v)
-        s=float(s)
+        v,s = _fix_val(v,s)
 
         self.units=kargs.pop("units","")
         self.mode=kargs.pop("mode","float")
