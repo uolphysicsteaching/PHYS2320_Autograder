@@ -60,6 +60,12 @@ def replace_show(*args, **kargs):
     )
     return plt.figure()
 
+def replace_close(*args, **kargs):
+    """A repalcement for matplotlib.show() that actyally calls plt.figure()."""
+    print(
+        "<p>plt.close() called which means we can't capture the figures. Stopping the call.</p>"
+    )
+    return None
 
 builtins.input = no_input
 
@@ -333,11 +339,14 @@ class Assessor(object):
         except Exception as err1:
             print("<H3>Code threw an Error!</H3>")
             try:
-                print(format_exc().replace("\n", "<br/>\n"))
+                error_string=format_exc().replace("\n", "<br/>\n")
+                print(error_string)
+                self._exception=error_string
             except Exception as err:
                 print(
                     f"Couldn't get strack trace while processing {err1}, error eas {err}"
                 )
+                self._exception=str(err)
             results = {}
             dt = 1e-9
             raise excp.StudentCodeError("Student code threw and error !")
@@ -708,6 +717,7 @@ class Assessor(object):
             try:
                 sys.stdout = tmp
                 sys.stderr = sys.stdout
+                temp_close=plt.close
                 cwd = os.getcwd()
                 self.get_info()
                 user_settings = read_user_data(self.data)
@@ -745,6 +755,7 @@ class Assessor(object):
                     raise excp.NoCdeError("No student code module located")
                 else:
                     plt.show = replace_show
+                    plt.close=replace_close
                     if "sys" in dir(self.module):
                         print(
                             "<p>Patching code to stop sys.exit from exiting test framework!</p>"
@@ -826,19 +837,31 @@ class Assessor(object):
                 self.show_code()
                 print("</body></html>")
                 (sys.stdout, sys.stderr) = restore
-                self._exception=err
+                self._exception=err_string
                 print(f"Hit exception {err} for {self.name} ({self.issid})")
-            except Exception as err:
-                print(format_exc().replace("\n", "<br/>\n"))
+            except excp.StudentCodeError as err:
+                err_string=str(err).replace("\n","<br/>\n")
+                print(err_string)
                 self.show_code()
                 print("</body></html>")
                 plt.close("all")
                 (sys.stdout, sys.stderr) = restore
-                self.exception=err
                 print(f"Hit exception {err} for {self.name} ({self.issid})")
-
+            except Exception as err:
+                err_string=str(err).replace("\n","<br/>\n")
+                print(err_string)
+                self.show_code()
+                print("</body></html>")
+                plt.close("all")
+                (sys.stdout, sys.stderr) = restore
+                self.exception=err_string
+                print(f"Hit exception {err} for {self.name} ({self.issid})")
             else:
                 (sys.stdout, sys.stderr) = restore
+            finally:
+                plt.close=temp_close #unpatch plt.close
+                plt.close("all")
+
         os.chdir(cwd)
 
         # os.unlink(path.join(subdir,"skip"))
