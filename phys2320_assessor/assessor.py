@@ -97,6 +97,7 @@ class Assessor(object):
         self.mods = []
         self.files = []
         self.metadata = {}
+        self.temp_close=plt.close
         (self.conn, self.cur) = dbconn
         self._exception=None
 
@@ -369,7 +370,7 @@ class Assessor(object):
                     )
                 )
                 fig.savefig(filename)
-            plt.close("all")
+            self.temp_close("all")
         except Exception as err:
             out.append(f"An error occured trying to save the figures!\n{err}")
         out.append("</tr></table>")
@@ -717,7 +718,6 @@ class Assessor(object):
             try:
                 sys.stdout = tmp
                 sys.stderr = sys.stdout
-                temp_close=plt.close
                 cwd = os.getcwd()
                 self.get_info()
                 user_settings = read_user_data(self.data)
@@ -859,7 +859,7 @@ class Assessor(object):
             else:
                 (sys.stdout, sys.stderr) = restore
             finally:
-                plt.close=temp_close #unpatch plt.close
+                plt.close=self.temp_close #unpatch plt.close
                 plt.close("all")
 
         os.chdir(cwd)
