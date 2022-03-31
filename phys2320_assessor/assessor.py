@@ -49,6 +49,7 @@ from .funcs import (
     compare_dicts
 )
 
+number_pat=re.compile(r'(?P<number>[\+\-]?[0-9]+(\.[0-9]+)?([Ee][\+\-]?[0-9]+)?)')
 
 def no_input(*args, **kargs):
     raise excp.InputUsedError("input() was used when you were told not to use input!")
@@ -550,7 +551,26 @@ class Assessor(object):
                     key, student, model_ans, calc_ans, klass, message
                 )
             )
-
+        elif isinstance(model_ans, float) and isinstance(student, str):
+            match=number_pat.search(student)
+            if match:
+                student=float(match.groupdict()["number"])
+                message, score = self.three_way(student, model_ans, calc_ans)
+                message+="(student answer converted from string!)"
+                klass = self.colors[score]
+                ret=score in [0,3]
+                print(
+                    "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td bgcolor='{}'>{}</td>".format(
+                        key, student, model_ans, calc_ans, klass, message
+                    )
+                )
+            else:
+                print(
+                    "<tr><td>{}</td><td colspan=4>Model answer not interpretable:{}</td></tr>".format(
+                        key, type(model_ans)
+                    )
+                )
+                ret = False
         else:
             print(
                 "<tr><td>{}</td><td colspan=4>Model answer not interpretable:{}</td></tr>".format(
