@@ -17,6 +17,7 @@ import sqlite3
 import glob
 from pprint import pformat
 
+import mccabe
 from pylint.lint import Run as pylintRun
 from traceback import format_exc
 from time import perf_counter
@@ -164,15 +165,20 @@ class Assessor(object):
               thinks something is a problem, does not mean you have been marked down for it. This information is provided
               to help the (human) graders evaluate your code.</p>""")
         stats=results.linter.stats
-        quality=stats["global_note"]*10
+        quality=stats.global_note*10
         print("<h3>Code Liniting statistics</h3>\n<ul>")
         print(f"<li>Pylint code quality score: {round(quality,1)}%</li>")
-        print(f"<li>Number of warning detected: {stats['warning']}</li>")
-        print(f"<li>Number of errors detected: {stats['error']}</li>")
-        print(f"<li>Number of fatal errors detected: {stats['fatal']}</li>")
-        print(f"<li>Number of functions: {stats['function']}</li>")
-        print(f"<li>... of which undocumented: {round(100*stats['undocumented_function']/stats['function'],1)}%</li>")
-        print(f"<li>Percentage of duplicated lines: {round(stats['percent_duplicated_lines'],1)}</li>")
+        print(f"<li>Number of warning detected: {stats.warning}</li>")
+        print(f"<li>Number of errors detected: {stats.error}</li>")
+        print(f"<li>Number of fatal errors detected: {stats.fatal}</li>")
+        print(f"<li>Number of functions: {stats.get_node_count('function')}</li>")
+        print(f"<li>... of which undocumented: {round(100*stats.undocumented['function']/stats.get_node_count('function'),1)}%</li>")
+        print(f"<li>Percentage of duplicated lines: {round(stats.percent_duplicated_lines,1)}</li>")
+        print(f"<li>Running mccabe analysis tool:")
+        with CaptureOutput() as out:
+            complexity=mccabe.get_code_complexity(Path(filename).read_text(),threshold=10,filename=filename)
+        out=str(out).replace('\n','<br/>\n')
+        print(f"<ol>{out}</ol><br/>Overall score {complexity}</li>")
         print("</ul>")
         radon=proc.run(["bash","-c",f"radon cc --average {filename}"],stdout=proc.PIPE, stderr=proc.PIPE)
         print("<h3>Complexity Analysis</h3>")
@@ -842,6 +848,7 @@ class Assessor(object):
             except excp.StudentCodeError as err:
                 err_string=str(err).replace("\n","<br/>\n")
                 print(err_string)
+                self.exception=err_string
                 self.show_code()
                 print("</body></html>")
                 plt.close("all")
@@ -1069,25 +1076,22 @@ class Assessor(object):
                 else:  # Ok we're good to go !
                     self.run_student = self.module.ProcessData
         except ImportError as err:
+            err_string=f"{err}".replace("\n","<br/>\n")
             print(
-                "Failed to inmport  module correctly\nmessage was:\n{}\n Check manually.".format(
-                    err
-                ).replace(
-                    "\n", "<br/<\n"
-                )
+                f"Failed to inmport  module correctly\nmessage was:\n{err_string}\n Check manually."
             )
             print(format_exc().replace("\n", "<br/>\n"))
             self.module = None
+            self._exception=err_string
+            raise err
         except Exception as err:
+            err_string=f"{err}".replace("\n","<br/>\n")
             print(
-                "<h2>Something is wrong with the  module\nMessage was\n{}\n Check manually !</h2>".format(
-                    err
-                ).replace(
-                    "\n", "<br>\n"
-                )
+                f"<h2>Something is wrong with the  module\nMessage was\n{err_string}\n Check manually !</h2>"
             )
-            print(format_exc())
+            print(format_exc().replace("\n","<br/>\n"))
             self.module = None
+            self._exception=err_string
             raise err
         finally:
             os.chdir(back)
