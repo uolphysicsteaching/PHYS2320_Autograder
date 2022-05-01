@@ -4,6 +4,7 @@ __all__ = ["Assessor"]
 
 from os import path
 import builtins
+import base64
 import re
 import os
 import io
@@ -209,11 +210,29 @@ class Assessor(object):
             .orange {color: orange; }
             .green {color: green; }
             body {width: 1280px;}
+            @media print {
+                body {
+                    font-size: 11pt !important;
+                    width: 28cm !important;
+                    }
+                h1 {
+                    font-size: 14pt;
+                    }
+                h2 {
+                    font-size: 13pt;
+                    }
+                h3 {
+                    fon t-size: 12pt;
+                    }
+                table {max-width: 28cm; }
+                img.figure {max-width: 7cm;}
+            }
             @page {
-              size: A4; /* Change from the default size of A4 */
+              size: A4 landscape; /* Change from the default size of A4 */
               margin: 2cm; /* Set margin on each page */
             }
             </style>
+            <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.1/themes/base/jquery-ui.css">
             <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lato">
             """
         return ret
@@ -238,8 +257,27 @@ class Assessor(object):
         <head>
             <title>Report on {self.name} ({self.issid})</title>
             {self.stylesheets()}
+            <script
+            <script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
+            <script src="https://code.jquery.com/ui/1.13.1/jquery-ui.min.js" integrity="sha256-eTyxS0rkjpLEo16uXTS0uVCS4815lc40K2iVpWDvdSY=" crossorigin="anonymous"></script>
+            <script>
+            $(document).ready(function () {{
+                $('#dialog').dialog({{
+                    autoOpen: false,
+                    closeOnEscape: true,
+                    width: 800,
+                    height: 600,
+                }});
+                $('.figure').click(function () {{
+                    $("#dialog").html('<img style="max-height: 600px; max-width: 800px;" src="'+$(this).attr('src')+'">');
+                    $("#dialog").dialog("open");
+                    }});
+
+                }});
+             </script>
         </head>
         <body>
+            <div id='dialog'>&nbsp;</div>
             <h1>Report on {self.name} ({self.issid})</h2>"""
         )
 
@@ -370,13 +408,13 @@ class Assessor(object):
                 open_figures()
             ):  # Close and open figures from the import
                 fig.show()
-                filename = pattern.format(i)
+                buffer=io.BytesIO()
+                fig.savefig(buffer,format="png")
+                buffer.seek(0)
+                data=base64.encodebytes(buffer.getvalue()).decode("ascii").strip()
                 out.append(
-                    "<td><a href='{filename}'><img src='{filename}' width=200px></a></td>".format(
-                        filename=filename
-                    )
+                    f"<td><img class='figure' src='data:image/png;base64,{data}' width=200px></td>"
                 )
-                fig.savefig(filename)
             self.temp_close("all")
         except Exception as err:
             out.append(f"An error occured trying to save the figures!\n{err}")
