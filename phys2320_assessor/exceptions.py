@@ -37,3 +37,7 @@ class NoCpdeError(Exception):
 class StudentCodeExit(Exception):
 
     """Student code didn't return results."""
+
+class SecondRunException(Exception):
+
+    """Hit a problem when running the standard data."""
