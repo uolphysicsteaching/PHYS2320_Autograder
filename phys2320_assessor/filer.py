@@ -11,6 +11,7 @@ import os.path as path
 import argparse
 import re
 import zipfile
+from datetime import datetime
 import glob
 
 def parse_args():
@@ -23,11 +24,19 @@ def parse_args():
 def build_submission_list(dir,SUBMISSIION_PATTERN):
     """SCan the directory dir and find all submission description files."""
     pattern=re.compile(SUBMISSIION_PATTERN)
-    files=list()
+    files=dict()
+    submisisons=dict()
     for f in sorted(os.listdir(dir)):
-        if pattern.match(f) is not None:
+        if match:=pattern.match(f):
             print("{} Matched pattern".format(f))
-            files.append(f)
+            username=match.group(1)
+            submission_date=match.group(2)
+            s_date=datetime.strptime(submission_date,"%Y-%m-%d-%H-%M-%S")
+            if username in submisisons and submisisons[username]>s_date:
+                print(f"Skipping submission for {username} form {s_date} as submission from {submisisons[username]} is newer.")
+                continue
+            submisisons[username]=s_date
+            files[username]=f
     return files
 
 def process_file(f, clobber):
@@ -85,13 +94,5 @@ def file_work(ASSIGNMENT_DOWNLOAD,SUBMISSIION_PATTERN, clobber=True, directory="
 
     print("Processing Files: Building file list")
     files=build_submission_list(os.getcwd(),SUBMISSIION_PATTERN)
-    for f in files:
+    for u,f in files.items():
         process_file(f, clobber)
-
-
-
-
-
-
-
-

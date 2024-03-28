@@ -19,7 +19,7 @@ __all__ = [
     "zip_work"
 ]
 
-__version__ = "2021.2.0"
+__version__ = "2024.1.1"
 
 from .assessor import Assessor
 from .cohort import ComputingClass

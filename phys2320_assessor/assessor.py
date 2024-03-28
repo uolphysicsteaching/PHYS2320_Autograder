@@ -16,7 +16,7 @@ from pathlib import Path
 import subprocess as proc
 import sqlite3
 import glob
-from pprint import pformat
+from pprint import pformat, pprint
 
 import mccabe
 from pylint.lint import Run as pylintRun
@@ -102,7 +102,7 @@ class Assessor(object):
         self.metadata = {}
         self.temp_close=plt.close
         (self.conn, self.cur) = dbconn
-        self._exception=None
+        self._exception=[]
 
 
     def __getstate__(self):
@@ -131,6 +131,17 @@ class Assessor(object):
     def get_calc_answers(self, filenameet):
         """Must be implemented in the specific sub class !"""
         raise NotImplementedError("This method should be defined in a sub-class")
+
+    def get_std_data(self):
+        """This needs to place the stadnard data file into the correct folder for moving.
+
+        Look for:
+            - self.stdfile_pattern
+            -self.stdfile_match
+            - self.stdfile_dir
+        """
+        raise NotImplementedError("This method should be defined in a sub-class")
+
 
     def normalise_entry(self, entry):
         """Do whatever is needed to get this entry into a set of well formatted Results."""
@@ -387,12 +398,12 @@ class Assessor(object):
             try:
                 error_string=format_exc().replace("\n", "<br/>\n")
                 print(error_string)
-                self._exception=error_string
+                self._exception.append(error_string)
             except Exception as err:
                 print(
                     f"Couldn't get strack trace while processing {err1}, error eas {err}"
                 )
-                self._exception=str(err)
+                self._exception.append(str(err))
             results = {}
             dt = 1e-9
             raise excp.StudentCodeError("Student code threw and error !")
@@ -440,6 +451,7 @@ class Assessor(object):
                 ret = "Both student and model are correct but don't match", 0
             elif student_correct and not model_correct:
                 ret = "Student correct, but model answer isn't", 1
+                self._exception.append("Student correct, but model answer isn't")
             elif model_correct and not student_correct:
                 ret = "Model answer correct, but student is not", 2
             elif student_model and not student_correct and not model_correct:
@@ -576,7 +588,7 @@ class Assessor(object):
             ret=score in [0,3]
             klass = self.colors[score]
             print(
-                "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td bgcolor='{}'>{}</td>".format(
+                "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td style='background-color:{};'>{}</td>".format(
                     key, student, model_ans, cval, klass, message
                 )
             )
@@ -585,7 +597,7 @@ class Assessor(object):
             klass = self.colors[score]
             ret=score in [0,3]
             print(
-                "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td bgcolor='{}'>{}</td>".format(
+                "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td style='background-color:{}'>{};</td>".format(
                     key, student, model_ans, calc_ans, klass, message
                 )
             )
@@ -598,7 +610,7 @@ class Assessor(object):
                 klass = self.colors[score]
                 ret=score in [0,3]
                 print(
-                    "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td bgcolor='{}'>{}</td>".format(
+                    "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td style='background-color:{};'>{}</td>".format(
                         key, student, model_ans, calc_ans, klass, message
                     )
                 )
@@ -789,6 +801,8 @@ class Assessor(object):
 
                 std_filename = self.stdfile_pattern.format(**user_settings)
                 self.std_data = path.join(self.subdir, std_filename)
+                if not path.exists(self.std_data):
+                    self.get_std_data()
                 shutil.copyfile(
                     path.join(self.stdfile_dir, std_filename), self.std_data
                 )
@@ -901,12 +915,15 @@ class Assessor(object):
                 self.show_code()
                 print("</body></html>")
                 (sys.stdout, sys.stderr) = restore
-                self._exception=err_string
+                self._exception.append(err_string)
                 print(f"Hit exception {err} for {self.name} ({self.issid})")
             except excp.StudentCodeError as err:
                 err_string=str(err).replace("\n","<br/>\n")
                 print(err_string)
                 self.exception=err_string
+                print("<p>Showing calcululated results for comparison</p>\n<pre>\n")
+                pprint(self.calc_answers)
+                print("</pre>")
                 self.show_code()
                 print("</body></html>")
                 plt.close("all")
@@ -915,6 +932,9 @@ class Assessor(object):
             except Exception as err:
                 err_string=str(err).replace("\n","<br/>\n")
                 print(err_string)
+                print("<p>Showing calcululated results for comparison</p>\n<pre>\n")
+                pprint(self.calc_answers)
+                print("</pre>")
                 self.show_code()
                 print("</body></html>")
                 plt.close("all")
@@ -1140,7 +1160,7 @@ class Assessor(object):
             )
             print(format_exc().replace("\n", "<br/>\n"))
             self.module = None
-            self._exception=err_string
+            self._exception.append(err_string)
             raise err
         except Exception as err:
             err_string=f"{err}".replace("\n","<br/>\n")
@@ -1149,7 +1169,7 @@ class Assessor(object):
             )
             print(format_exc().replace("\n","<br/>\n"))
             self.module = None
-            self._exception=err_string
+            self._exception.append(err_string)
             raise err
         finally:
             os.chdir(back)
