@@ -36,7 +36,7 @@ requirements:
     - pypdf2
     - uncertainties
     - weasyprint
-    - dateutil
+    - python-dateutil
 
 about:
   home: "https://github.com/uolphysicsteaching/PHYS2320_Autograder"
