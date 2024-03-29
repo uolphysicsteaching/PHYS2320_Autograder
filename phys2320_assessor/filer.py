@@ -7,47 +7,107 @@ Created on Thu Mar 25 11:36:55 2021
 @author: phygbu
 """
 import os
-import os.path as path
+from pathlib import Path
 import argparse
 import re
 import zipfile
 from datetime import datetime
+from dateutil.parser import parse as date_parse
 import glob
 
 
 def parse_args():
-    """Parse command line arguments"""
+    """Parse command line arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument("dir")
     args = parser.parse_args()
     return args.dir
 
 
-def build_submission_list(dir, SUBMISSIION_PATTERN):
-    """SCan the directory dir and find all submission description files."""
+def scan_sbumissions(directory="Student Work"):
+    """Build a list of student and dates that are already in the student work folder.
+
+    Keyword Args:
+        directory (str):
+            Root directory on unpacked student work. Defaults to *Student Work*
+
+    Returns:
+        (Dict[str,datetime]):
+            Dictionary of username->submission date
+
+    Notes:
+        Assumes that there is aMinerva submission log file called readme.txt for each submission (this is what filer
+        would save the log file as). Looks for a line starting Name: <student name>(issid) and uses that for the user
+        and a line starting Submission Date:
+    """
+    directory = Path(directory)
+    # Regexps for the user and date submitted lines in the submission readme
+    user_pat = re.compile(r"Name\:[^\(]+([^\)]+)\)")
+    submitted_pat = re.compile(r"Date\sSubmitted\:\s(.*)")
+    # Initialise our list of submissions
+    existing = {}
+    # Find all readmes
+    for readme in directory.rglob("readme.txt"):
+        data = readme.read_text()
+        submitted = submitted_pat.search(data).group(1).replace("o'clock ", "")
+        submitted = date_parse(submitted)
+        user = user_pat.search(data).group(1)
+        existing[user] = submitted
+    return existing
+
+
+def build_submission_list(directory, SUBMISSIION_PATTERN, ignore_existing=False):
+    """SCan the directory dir and find all submission description files.
+
+    Args:
+        directory (str):
+            Directory where student submissions have been unpacked.
+        SUBMISSIION_PATTERN (str):
+            Regular expression that matches the submission description text file.
+
+    Keyword Arguments:
+        ignore_exising (bool, default False):
+            If True, then don't look for existing submissions. The default False value will make sure we
+            don't clobber an existing submission with the same or older files - making it safe to repeadtedly unzip
+            the student work and/or edit student files.
+
+    Returns:
+        (List[str]):
+            Returns the list of submission descriptions to process.
+    """
     pattern = re.compile(SUBMISSIION_PATTERN)
     files = dict()
-    submisisons = dict()
-    for f in sorted(os.listdir(dir)):
+    submisisons = scan_sbumissions(directory) if not ignore_existing else {}
+    breakpoint()
+    for f in sorted(os.listdir(directory)):
         if match := pattern.match(f):
             print("{} Matched pattern".format(f))
             username = match.group(1)
             submission_date = match.group(2)
             s_date = datetime.strptime(submission_date, "%Y-%m-%d-%H-%M-%S")
-            if username in submisisons and submisisons[username] > s_date:
+            if username in submisisons and submisisons[username] >= s_date:
                 print(
                     f"Skipping submission for {username} form {s_date} as submission from {submisisons[username]} is newer."
                 )
                 continue
             submisisons[username] = s_date
             files[username] = f
+    breakpoint()
     return files
 
 
-def process_file(f, clobber):
-    """Read a submission description file and do the appropriate filing operations."""
+def process_file(readme, clobber):
+    """Read a submission description file and do the appropriate filing operations.
+
+    Args:
+        readme (str):
+            Path to the submission description file.
+        clobber (bool):
+            Whether to clobber existing entries or not.
+    """
     namepat = re.compile(r"Name:\s*([^\(]*)\(([^\)]*)\)")
-    with open(f, "r", encoding="utf-8") as submission:
+    readme = Path(readme)
+    with open(readme, "r", encoding="utf-8") as submission:
         for ix, line in enumerate(submission):
             if line.startswith("Name:") and ix == 0:
                 nameline = namepat.match(line)
@@ -56,44 +116,60 @@ def process_file(f, clobber):
             elif line.startswith("Files:"):
                 break
         else:
-            raise RuntimeError("File {} didn't seem to have any submitted files !.".format(f))
+            raise RuntimeError(f"File {readme} didn't seem to have any submitted files !.")
         moves = list()
         name = name.replace(" ", "_")
-        pth = "{}_{}".format(issid, name).strip()
+        pth = Path(f"{issid}_{name}")
         for line in submission:
             if line.strip().startswith("Original filename:"):
                 parts = line.strip().split(":")
-                dest = path.join(pth, parts[1].strip())
+                dest = pth / parts[1].strip()
             elif line.strip().startswith("Filename:"):
                 parts = line.strip().split(":")
-                src = parts[1].strip()
-                if clobber or not path.exists(dest):
+                src = Path(parts[1].strip())
+                if clobber or not dest.exists():
                     moves.append((src, dest))
     print("Making {}".format(pth))
-    if not path.exists(pth):
+    if not pth.exists():
         os.mkdir(pth)
-    print("Moving {} to {}".format(f, path.join(pth, "readme.txt")))
-    if not path.exists(path.join(pth, "readme.txt")):
-        os.rename(f, path.join(pth, "readme.txt"))
+    print(f"Moving {readme} to {pth}/readme.txt")
+    if not pth / "readme.txt".exists():
+        os.rename(readme, pth / "readme.txt")
     for src, dest in moves:
         print("Moving {} to {}".format(src, dest))
-        if path.exists(dest) and path.exists(src):  # Only unlik if the source path also exists!
+        if dest.exists() and src.exists():  # Only unlik if the source path also exists!
             os.unlink(dest)
         try:
             os.rename(src, dest)
         except:
-            print("Move failed for: {}".format(src))
-    if path.exists(f):
-        os.unlink(f)  # Remove the readme file if it exists
+            print(f"Move failed for: {src}")
+    if readme.exists():
+        os.unlink(readme)  # Remove the readme file if it exists
 
 
 def file_work(ASSIGNMENT_DOWNLOAD, SUBMISSIION_PATTERN, clobber=True, directory="Student Work"):
-    """Run the filing script."""
+    """Run the filing script.
+
+    Args:
+        ASSIGNMENT_DOWNLOAD (str):
+            glob pattern for matching Gradbook zip files.
+        SUBMISSIION_PATTERN (str):
+            Regular expression string for matching submission description files
+
+    Keyword Arguments:
+        clobber (bool):
+            Whether to clobber existing files on copy (NB new code scans existing directories for new entries)
+        directory (str):
+            Working directory (default Student Woek)
+
+    Unzips gradebook files and then scans for submission descriptions and moves them into sub-folders for processing.
+    If the same or newer entry has already been unzipped and moved then does nothing.
+    """
 
     os.makedirs(directory, exist_ok=True)
     os.chdir(directory)
 
-    for zipf in glob.glob(ASSIGNMENT_DOWNLOAD):
+    for zipf in Path(".").glob(ASSIGNMENT_DOWNLOAD):
         with zipfile.ZipFile(zipf, mode="r") as downloaded:
             print("Extracting Zip File")
             downloaded.extractall()

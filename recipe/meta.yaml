@@ -1,5 +1,5 @@
 {% set data = load_setup_py_data() %}
-{% set version = "2024.1.2" %}
+{% set version = "2024.2.0" %}
 
 package:
   name: "phys2320_assessor"
@@ -36,6 +36,7 @@ requirements:
     - pypdf2
     - uncertainties
     - weasyprint
+    - dateutil
 
 about:
   home: "https://github.com/uolphysicsteaching/PHYS2320_Autograder"

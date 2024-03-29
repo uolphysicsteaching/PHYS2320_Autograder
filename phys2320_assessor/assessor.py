@@ -729,9 +729,10 @@ class Assessor(object):
 
                 std_filename = self.stdfile_pattern.format(**user_settings)
                 self.std_data = path.join(self.subdir, std_filename)
-                if not path.exists(self.std_data):
+                src = path.join(self.stdfile_dir, std_filename)
+                if not path.exists(src):
                     self.get_std_data()
-                shutil.copyfile(path.join(self.stdfile_dir, std_filename), self.std_data)
+                shutil.copyfile(src, self.std_data)
 
                 userfile = path.split(self.data)[-1]
                 stdfile = path.split(self.std_data)[-1]
@@ -750,7 +751,7 @@ class Assessor(object):
                     print("<h3>New Global Variables added!</h3>")
                     print(
                         f"""<p>Importing the code should not introduce new global variables. This implies that some
-                          code has executed and has used global variables. If so, -1 grades on structure.<p>
+                          code has executed and has used global variables. If so, structure is capped at a 2.2.<p>
                           <pre>{pformat(new_globals,indent=4)}</pre>"""
                     )
 
@@ -807,7 +808,7 @@ class Assessor(object):
                         print("<h3>New Global Variables added!</h3>")
                         print(
                             f"""<p>Running the code should not introduce new global variables. This implies that some
-                              code has executed and has used global variables. If so, -1 grades on structure if not
+                              code has executed and has used global variables. If so, structure is capped at a 2.2 if not
                               already taken off from the import.<p>
                               <pre>{pformat(new_globals,indent=4)}</pre>"""
                         )
